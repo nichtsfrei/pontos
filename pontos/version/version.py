@@ -270,7 +270,7 @@ __version__ = "{}"\n"""
     def print_current_version(self) -> None:
         self._print(self.get_current_version())
 
-    def run(self) -> Union[int, str]:
+    def run(self, args=None) -> Union[int, str]:
         args = self.parser.parse_args()
 
         if not getattr(args, 'command', None):

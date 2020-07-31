@@ -14,10 +14,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import sys
+from pathlib import Path
 from .__version__ import __version__
 
 from .version import (
+    PontosVersionCommand,
     VersionCommand,
     VersionError,
     safe_version,
@@ -27,6 +29,19 @@ from .version import (
 )
 
 from .cmake_version import CMakeVersionParser, CMakeVersionCommand
+
+
+def main(args=None):
+    available_cmds = [
+        ('CMakeLists.txt', CMakeVersionCommand),
+        ('pyproject.toml', PontosVersionCommand),
+    ]
+    for file_name, cmd in available_cmds:
+        project_definition_path = Path.cwd() / file_name
+        if project_definition_path.exists():
+            sys.exit(cmd().run(args))
+    sys.exit("No command found")
+
 
 __all__ = [
     '__version__',

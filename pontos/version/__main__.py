@@ -17,24 +17,7 @@
 
 # pylint: disable=invalid-name
 
-import sys
-
-from pathlib import Path
-from .version import PontosVersionCommand
-from .cmake_version import CMakeVersionCommand
-
-
-def main():
-    available_cmds = [
-        ('CMakeLists.txt', CMakeVersionCommand),
-        ('pyproject.toml', PontosVersionCommand),
-    ]
-    for fileName, cmd in available_cmds:
-        project_definition_path = Path.cwd() / fileName
-        if project_definition_path.exists():
-            sys.exit(cmd().run())
-    sys.exit("No command found")
-
+from pontos import version
 
 if __name__ == '__main__':
-    main()
+    version.main()
