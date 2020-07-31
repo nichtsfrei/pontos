@@ -116,5 +116,7 @@ def _tokenize(
 ]:
     toks, remainder = __CHANGELOG_SCANNER.scan(markdown)
     if remainder != '':
-        print('WARNING: unrecognized tokens: {}'.format(remainder))
+        raise ChangelogError(
+            "unrecognized tokens in markdown: {}".format(remainder)
+        )
     return toks
