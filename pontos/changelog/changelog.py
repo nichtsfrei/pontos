@@ -17,8 +17,8 @@
 
 
 import re
-from typing import Tuple, Generator
-from pathlib import Path
+from typing import Tuple, Generator, Optional
+from datetime import date
 
 
 class ChangelogError(Exception):
@@ -27,42 +27,68 @@ class ChangelogError(Exception):
     """
 
 
-class ChangelogParser:
+class Changelog:
 
     __cmake_scanner = None
     _markdown = None
 
-    def __init__(self, markdown: str):
+    def __init__(self, markdown: str, git_tag_prefix='v'):
         self._markdown = markdown
         self.__cmake_scanner = self.__build_scanner()
+        self._git_tag_prefix = git_tag_prefix
 
     __unreleased_matcher = re.compile("unreleased", re.IGNORECASE)
+    __master_matcher = re.compile("master")
 
-    def find_unreleased(
-        self, containing_version: str = None
-    ) -> Tuple[int, int, str]:
+    def update(
+        self, new_version: str, containing_version: str = None
+    ) -> Tuple[str, str, str]:
+        """
+        update tokenizes CHANGELOG.md and if a version is given it changes
+        unreleased headline and link to given version.
+
+        returns original markdown, updated markdown and change log for further
+        processing.
+        """
         tokens = self._tokenize()
-        start_ln = 0
         hc = 0
-        result = []
-        for ln, tt, heading_count, tc in tokens:
+        changelog = ""
+        updated_markdown = ""
+        may_changelog_relevant = True
+        for tt, heading_count, tc in tokens:
             if tt == 'unreleased':
-                if containing_version and tc.contains(containing_version):
-                    start_ln = ln
+                if (
+                    containing_version and containing_version in tc
+                ) or not containing_version:
                     hc = heading_count
-                elif not containing_version:
-                    start_ln = ln
-                    hc = heading_count
+                    if new_version:
+                        tc = self.__unreleased_matcher.sub(new_version, tc)
+                        tc += " - {}".format(date.today().isoformat())
             elif heading_count > 0 and hc > 0 and heading_count <= hc:
-                return (start_ln, ln, "\n".join(result))
-            append_word = hc > 0
-            if append_word:
-                result.append(tc)
+                may_changelog_relevant = False
+            if tt == 'unreleased_link' and new_version:
+                tc = self.__unreleased_matcher.sub(new_version, tc)
+                tc = self.__master_matcher.sub(
+                    "{}{}".format(self._git_tag_prefix, new_version), tc
+                )
 
-        if start_ln > 0:
-            return (start_ln, len(tokens) - 1, "\n".join(result))
+            updated_markdown += tc
+            if may_changelog_relevant:
+                append_word = hc > 0
+                if append_word:
+                    changelog += tc
 
-        raise ChangelogError("No unreleased information found.")
+        return (
+            self._markdown,
+            updated_markdown if changelog else "",
+            changelog,
+        )
+
+    def changelog(
+        self, new_version: str = None, containing_version: str = None
+    ) -> Optional[str]:
+        _, _, result = self.update(new_version, containing_version)
+        return result if result else None
 
     def __build_scanner(self):
         def token_handler(key: str):
@@ -85,6 +111,7 @@ class ChangelogParser:
                 (r'#{1,} Fixed', token_handler("fixed")),
                 (r'#{1,} Security', token_handler("security")),
                 (r'#{1,}.*(?=[Uu]nreleased).*', token_handler("unreleased")),
+                (r'\[[Uu]nreleased\].*', token_handler("unreleased_link"),),
                 (r'#{1,} .*', token_handler("heading")),
                 (r'\n', token_handler("newline")),
                 (r'..*', token_handler("any")),
@@ -101,15 +128,4 @@ class ChangelogParser:
         toks, remainder = self.__cmake_scanner.scan(self._markdown)
         if remainder != '':
             print('WARNING: unrecognized tokens: {}'.format(remainder))
-        line_num = 0
-        for tok_type, heading_count, tok_contents in toks:
-            line_num += tok_contents.count('\n')
-            yield line_num, tok_type, heading_count, tok_contents.strip()
-
-
-if __name__ == "__main__":
-    PATH = Path.cwd() / "CHANGELOG.md"
-    PARSER = ChangelogParser(PATH.read_text())
-    print(PARSER.find_unreleased()[2])
-    print(PARSER.find_unreleased()[0])
-    print(PARSER.find_unreleased()[1])
+        return toks
