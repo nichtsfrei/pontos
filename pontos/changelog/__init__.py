@@ -1,1 +1,1 @@
-from .changelog import Changelog, ChangelogError
+from .changelog import update, ChangelogError

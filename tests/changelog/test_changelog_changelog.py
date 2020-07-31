@@ -1,5 +1,5 @@
 import unittest
-from pontos.changelog import Changelog
+from pontos import changelog
 
 
 class ChangelogTestCase(unittest.TestCase):
@@ -14,7 +14,8 @@ something, somehing
 - cool stuff 1
 - cool stuff 2
 """
-        self.assertIsNone(Changelog(test_md).changelog())
+        _, cl = changelog.update(test_md, '')
+        self.assertEqual(cl, '')
 
     def test_find_unreleased_information_before_another_version(self):
         unreleased = """
@@ -41,7 +42,7 @@ something, somehing
         """.format(
             unreleased
         )
-        result = Changelog(test_md).changelog()
+        _, result = changelog.update(test_md, '')
         self.assertEqual(result.strip(), unreleased.strip())
 
 
@@ -62,7 +63,7 @@ I don't recognize it anymore
         """.format(
         unreleased
     )
-    result = Changelog(test_md).changelog()
+    _, result = changelog.update(test_md, '')
     self.assertEqual(result.strip(), unreleased.strip())
 
 
@@ -91,5 +92,5 @@ something, somehing
         """.format(
         unreleased
     )
-    result = Changelog(test_md).changelog()
+    _, result = changelog.update(test_md, '')
     self.assertEqual(result.strip(), unreleased.strip())

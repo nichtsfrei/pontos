@@ -1,5 +1,5 @@
 import unittest
-from pontos.changelog import Changelog
+from pontos import changelog
 
 
 class ChangelogUpdateTestCase(unittest.TestCase):
@@ -14,10 +14,9 @@ something, somehing
 - cool stuff 1
 - cool stuff 2
 """
-        original, updated, changelog = Changelog(test_md).update('1.2.3')
-        self.assertIs(original, test_md)
+        updated, release_notes = changelog.update(test_md, '1.2.3')
         self.assertIs('', updated)
-        self.assertIs('', changelog)
+        self.assertIs('', release_notes)
 
     def test_update_markdown_return_changelog(self):
         released = """
@@ -52,8 +51,7 @@ something, somehing
 - cool stuff 2"""
         test_md = test_md_template.format(unreleased)
         released_md = test_md_template.format(released)
-        original, updated, changelog = Changelog(test_md).update('1.2.3')
+        updated, release_notes = changelog.update(test_md, '1.2.3')
 
-        self.assertIs(original, test_md)
         self.assertEqual(released_md.strip(), updated.strip())
-        self.assertEqual(released.strip(), changelog.strip())
+        self.assertEqual(released.strip(), release_notes.strip())

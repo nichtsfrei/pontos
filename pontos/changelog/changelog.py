@@ -17,7 +17,7 @@
 
 
 import re
-from typing import Tuple, Generator, Optional
+from typing import Tuple, List
 from datetime import date
 
 
@@ -27,105 +27,94 @@ class ChangelogError(Exception):
     """
 
 
-class Changelog:
+__UNRELEASED_MATCHER = re.compile("unreleased", re.IGNORECASE)
+__MASTER_MATCHER = re.compile("master")
 
-    __cmake_scanner = None
-    _markdown = None
 
-    def __init__(self, markdown: str, git_tag_prefix='v'):
-        self._markdown = markdown
-        self.__cmake_scanner = self.__build_scanner()
-        self._git_tag_prefix = git_tag_prefix
+def update(
+    markdown,
+    new_version: str,
+    git_tag_prefix: str = 'v',
+    containing_version: str = None,
+) -> Tuple[str, str]:
+    """
+    update tokenizes CHANGELOG.md and if a version is given it changes
+    unreleased headline and link to given version.
 
-    __unreleased_matcher = re.compile("unreleased", re.IGNORECASE)
-    __master_matcher = re.compile("master")
+    returns updated markdown and change log for further processing.
+    """
+    tokens = _tokenize(markdown)
+    hc = 0
+    changelog = ""
+    updated_markdown = ""
+    may_changelog_relevant = True
+    for tt, heading_count, tc in tokens:
+        if tt == 'unreleased':
+            if (
+                containing_version and containing_version in tc
+            ) or not containing_version:
+                hc = heading_count
+                if new_version:
+                    tc = __UNRELEASED_MATCHER.sub(new_version, tc)
+                    tc += " - {}".format(date.today().isoformat())
+        elif heading_count > 0 and hc > 0 and heading_count <= hc:
+            may_changelog_relevant = False
+        if tt == 'unreleased_link' and new_version:
+            tc = __UNRELEASED_MATCHER.sub(new_version, tc)
+            tc = __MASTER_MATCHER.sub(
+                "{}{}".format(git_tag_prefix, new_version), tc
+            )
 
-    def update(
-        self, new_version: str, containing_version: str = None
-    ) -> Tuple[str, str, str]:
+        updated_markdown += tc
+        if may_changelog_relevant:
+            append_word = hc > 0
+            if append_word:
+                changelog += tc
+
+    return (
+        updated_markdown if changelog else "",
+        changelog,
+    )
+
+
+def __build_scanner():
+    def token_handler(key: str):
         """
-        update tokenizes CHANGELOG.md and if a version is given it changes
-        unreleased headline and link to given version.
+        generates a lambda for the regex scanner with a given key.
 
-        returns original markdown, updated markdown and change log for further
-        processing.
+        This lambda will return a tuple: key, count # of token and token.
+
+        The count is used to identify the level of heading on a special
+        ended which can be used to identify when this section ended.
         """
-        tokens = self._tokenize()
-        hc = 0
-        changelog = ""
-        updated_markdown = ""
-        may_changelog_relevant = True
-        for tt, heading_count, tc in tokens:
-            if tt == 'unreleased':
-                if (
-                    containing_version and containing_version in tc
-                ) or not containing_version:
-                    hc = heading_count
-                    if new_version:
-                        tc = self.__unreleased_matcher.sub(new_version, tc)
-                        tc += " - {}".format(date.today().isoformat())
-            elif heading_count > 0 and hc > 0 and heading_count <= hc:
-                may_changelog_relevant = False
-            if tt == 'unreleased_link' and new_version:
-                tc = self.__unreleased_matcher.sub(new_version, tc)
-                tc = self.__master_matcher.sub(
-                    "{}{}".format(self._git_tag_prefix, new_version), tc
-                )
+        return lambda _, token: (key, token.count('#'), token)
 
-            updated_markdown += tc
-            if may_changelog_relevant:
-                append_word = hc > 0
-                if append_word:
-                    changelog += tc
+    return re.Scanner(
+        [
+            (r'#{1,} Added', token_handler('added')),
+            (r'#{1,} Changed', token_handler("changed")),
+            (r'#{1,} Deprecated', token_handler("deprecated")),
+            (r'#{1,} Removed', token_handler("removed")),
+            (r'#{1,} Fixed', token_handler("fixed")),
+            (r'#{1,} Security', token_handler("security")),
+            (r'#{1,}.*(?=[Uu]nreleased).*', token_handler("unreleased")),
+            (r'\[[Uu]nreleased\].*', token_handler("unreleased_link"),),
+            (r'#{1,} .*', token_handler("heading")),
+            (r'\n', token_handler("newline")),
+            (r'..*', token_handler("any")),
+        ]
+    )
 
-        return (
-            self._markdown,
-            updated_markdown if changelog else "",
-            changelog,
-        )
 
-    def changelog(
-        self, new_version: str = None, containing_version: str = None
-    ) -> Optional[str]:
-        _, _, result = self.update(new_version, containing_version)
-        return result if result else None
+__CHANGELOG_SCANNER = __build_scanner()
 
-    def __build_scanner(self):
-        def token_handler(key: str):
-            """
-            generates a lambda for the regex scanner with a given key.
 
-            This lambda will return a tuple: key, count # of token and token.
-
-            The count is used to identify the level of heading on a special
-            ended which can be used to identify when this section ended.
-            """
-            return lambda _, token: (key, token.count('#'), token)
-
-        return re.Scanner(
-            [
-                (r'#{1,} Added', token_handler('added')),
-                (r'#{1,} Changed', token_handler("changed")),
-                (r'#{1,} Deprecated', token_handler("deprecated")),
-                (r'#{1,} Removed', token_handler("removed")),
-                (r'#{1,} Fixed', token_handler("fixed")),
-                (r'#{1,} Security', token_handler("security")),
-                (r'#{1,}.*(?=[Uu]nreleased).*', token_handler("unreleased")),
-                (r'\[[Uu]nreleased\].*', token_handler("unreleased_link"),),
-                (r'#{1,} .*', token_handler("heading")),
-                (r'\n', token_handler("newline")),
-                (r'..*', token_handler("any")),
-            ]
-        )
-
-    def _tokenize(
-        self,
-    ) -> Generator[
-        Tuple[int, str, int, str],
-        Tuple[int, str, int, str],
-        Tuple[int, str, int, str],
-    ]:
-        toks, remainder = self.__cmake_scanner.scan(self._markdown)
-        if remainder != '':
-            print('WARNING: unrecognized tokens: {}'.format(remainder))
-        return toks
+def _tokenize(
+    markdown,
+) -> List[
+    Tuple[int, str, int, str],
+]:
+    toks, remainder = __CHANGELOG_SCANNER.scan(markdown)
+    if remainder != '':
+        print('WARNING: unrecognized tokens: {}'.format(remainder))
+    return toks
