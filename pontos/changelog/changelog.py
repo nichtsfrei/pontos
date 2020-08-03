@@ -57,19 +57,31 @@ def update(
 
     returns updated markdown and change log for further processing.
     """
+
+    def may_add_skeleton(
+        heading_count, first_headline_state, markdown
+    ) -> (int, str):
+        if first_headline_state == -1 and heading_count == 1:
+            return 0, markdown
+        if first_headline_state == 0 and heading_count > 1:
+            prepared_skeleton = __UNRELEASED_SKELETON.format(
+                git_space, project_name, git_tag
+            )
+            return 1, markdown + prepared_skeleton
+        return first_headline_state, markdown
+
     git_tag = "{}{}".format(git_tag_prefix, new_version)
     tokens = _tokenize(markdown)
     hc = 0
     changelog = ""
     updated_markdown = ""
     may_changelog_relevant = True
-    in_first_headline = -1
+    first_headline_state = -1  # -1 initial, 0 found, 1 handled
+
     for tt, heading_count, tc in tokens:
-        if in_first_headline == -1 and heading_count == 1:
-            in_first_headline = 0
-        elif in_first_headline == 0 and heading_count > 1:
-            updated_markdown += "{}"
-            in_first_headline = 1
+        first_headline_state, updated_markdown = may_add_skeleton(
+            heading_count, first_headline_state, updated_markdown
+        )
         if tt == 'unreleased':
             if (
                 containing_version and containing_version in tc
@@ -89,10 +101,6 @@ def update(
             append_word = hc > 0
             if append_word:
                 changelog += tc
-    prepared_skeleton = __UNRELEASED_SKELETON.format(
-        git_space, project_name, git_tag
-    )
-    updated_markdown = updated_markdown.format(prepared_skeleton)
     return (
         updated_markdown if changelog else "",
         changelog,
