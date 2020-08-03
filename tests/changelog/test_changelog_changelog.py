@@ -14,7 +14,7 @@ something, somehing
 - cool stuff 1
 - cool stuff 2
 """
-        _, cl = changelog.update(test_md, '')
+        _, cl = changelog.update(test_md, '', '')
         self.assertEqual(cl, '')
 
     def test_find_unreleased_information_before_another_version(self):
@@ -42,7 +42,7 @@ something, somehing
         """.format(
             unreleased
         )
-        _, result = changelog.update(test_md, '')
+        _, result = changelog.update(test_md, '', '')
         self.assertEqual(result.strip(), unreleased.strip())
 
 
@@ -63,7 +63,7 @@ I don't recognize it anymore
         """.format(
         unreleased
     )
-    _, result = changelog.update(test_md, '')
+    _, result = changelog.update(test_md, '', '')
     self.assertEqual(result.strip(), unreleased.strip())
 
 
@@ -92,5 +92,5 @@ something, somehing
         """.format(
         unreleased
     )
-    _, result = changelog.update(test_md, '')
+    _, result = changelog.update(test_md, '', '')
     self.assertEqual(result.strip(), unreleased.strip())

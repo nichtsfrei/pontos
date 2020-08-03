@@ -30,11 +30,25 @@ class ChangelogError(Exception):
 __UNRELEASED_MATCHER = re.compile("unreleased", re.IGNORECASE)
 __MASTER_MATCHER = re.compile("master")
 
+__UNRELEASED_SKELETON = """## [Unreleased]
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+
+[Unreleased]: https://github.com/{}/{}/compare/{}...HEAD
+
+
+"""
+
 
 def update(
     markdown,
     new_version: str,
+    project_name: str,
     git_tag_prefix: str = 'v',
+    git_space: str = 'greenbone',
     containing_version: str = None,
 ) -> Tuple[str, str]:
     """
@@ -43,12 +57,19 @@ def update(
 
     returns updated markdown and change log for further processing.
     """
+    git_tag = "{}{}".format(git_tag_prefix, new_version)
     tokens = _tokenize(markdown)
     hc = 0
     changelog = ""
     updated_markdown = ""
     may_changelog_relevant = True
+    in_first_headline = -1
     for tt, heading_count, tc in tokens:
+        if in_first_headline == -1 and heading_count == 1:
+            in_first_headline = 0
+        elif in_first_headline == 0 and heading_count > 1:
+            updated_markdown += "{}"
+            in_first_headline = 1
         if tt == 'unreleased':
             if (
                 containing_version and containing_version in tc
@@ -61,16 +82,17 @@ def update(
             may_changelog_relevant = False
         if tt == 'unreleased_link' and new_version:
             tc = __UNRELEASED_MATCHER.sub(new_version, tc)
-            tc = __MASTER_MATCHER.sub(
-                "{}{}".format(git_tag_prefix, new_version), tc
-            )
+            tc = __MASTER_MATCHER.sub(git_tag, tc)
 
         updated_markdown += tc
         if may_changelog_relevant:
             append_word = hc > 0
             if append_word:
                 changelog += tc
-
+    prepared_skeleton = __UNRELEASED_SKELETON.format(
+        git_space, project_name, git_tag
+    )
+    updated_markdown = updated_markdown.format(prepared_skeleton)
     return (
         updated_markdown if changelog else "",
         changelog,

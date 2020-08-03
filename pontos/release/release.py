@@ -5,6 +5,7 @@ import pontos
 
 # 1. update version
 # 2. update markdown
+# 3. create commit
 # 3. create tag
 # 4. push tag
 # 5. create release:
@@ -37,8 +38,35 @@ def build_release_dict(
     }
 
 
+def update_version() -> bool:
+    return True
+
+
+def update_markdown() -> bool:
+    return True
+
+
+def commit_version_update() -> bool:
+    return True
+
+
+def create_tag() -> bool:
+    return True
+
+
+def create_release() -> bool:
+    return True
+
+
+def arg_parser():
+    # we need release
+    # next release
+
+    return None
+
+
 def main():
     print("going to upgrade")
     change_log_path = Path.cwd() / 'CHANGELOG.md'
-    pontos.changelog.update(change_log_path.read_text(), '0.0.2')
+    pontos.changelog.update(change_log_path.read_text(), '0.0.2', '')
     pontos.version.main(args=["update"])
