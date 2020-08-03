@@ -31,7 +31,7 @@ from .version import (
 from .cmake_version import CMakeVersionParser, CMakeVersionCommand
 
 
-def main(args=None):
+def main(leave=True, args=None):
     available_cmds = [
         ('CMakeLists.txt', CMakeVersionCommand),
         ('pyproject.toml', PontosVersionCommand),
@@ -39,8 +39,13 @@ def main(args=None):
     for file_name, cmd in available_cmds:
         project_definition_path = Path.cwd() / file_name
         if project_definition_path.exists():
-            sys.exit(cmd().run(args))
-    sys.exit("No command found")
+            result = cmd().run(args)
+            if leave:
+                sys.exit(result)
+            return result == 0, file_name
+    if leave:
+        sys.exit("No command found")
+    return False, ""
 
 
 __all__ = [
